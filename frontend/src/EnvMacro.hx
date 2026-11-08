@@ -10,7 +10,10 @@ using StringTools;
 final class EnvMacro {
 	@:persistent static var loaded:Map<String, String> = new Map();
 
-	public static macro function env(name:String, byDefault:String = null):Expr {
+	public static #if !docker macro #end function env(name:String, byDefault:String = null) #if docker :String #else :Expr #end {
+		#if docker
+		return Sys.getEnv(name) ?? byDefault;
+		#else
 		return macro $v{
 			switch Sys.getEnv(name) {
 				case null: switch loaded[name] {
@@ -20,12 +23,22 @@ final class EnvMacro {
 				case v: v;
 			}
 		}
+		#end
 	}
 
 	public static function load(path = '.', filename = '.env') {
+		#if !docker 
 		var content = File.getContent(Path.join([path, filename]));
 		for (key => value in parse(content))
 			loaded[key] = value;
+		#end
+	}
+
+	public static function init() {
+		load('../');
+		#if !docker
+		load('../', '.env.local');
+		#end
 	}
 
 	public static function parse(content:String):Map<String, String> {

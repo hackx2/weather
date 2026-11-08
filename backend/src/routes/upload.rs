@@ -1,9 +1,9 @@
-use axum::{body::Bytes, http::StatusCode};
+use axum::{body::Bytes, http::StatusCode, response::IntoResponse};
 use serde::Serialize;
 use tokio::task::spawn_blocking;
 
 use crate::{
-    hash, internal, sampler,
+    hash, internal,
     storage::{
         self,
         FileVariant::{self, Original, Sample},
@@ -16,10 +16,10 @@ pub struct UploadRes {
     hash: String,
     flags: u8, // pretty self explanatory, no?
     ext: &'static str,
-    mime:&'static str
+    mime: &'static str,
 }
 
-use crate::video;
+use crate::sample::{image, video};
 
 async fn process_video(hash: &str, ext: &'static str) -> Result<(), (StatusCode, String)> {
     let src = storage::path(Original, hash, ext);
@@ -89,7 +89,7 @@ fn mime_and_ext_for(body: &[u8]) -> Option<(&'static str, &'static str)> {
 use crate::flags;
 use axum::Json;
 
-pub async fn handle(body: Bytes) -> Result<Json<UploadRes>, (StatusCode, String)> {
+pub async fn handle(body: Bytes) -> Result<impl IntoResponse, (StatusCode, String)> {
     if body.is_empty() {
         return Err((StatusCode::BAD_REQUEST, "empty body".to_string()));
     }
@@ -117,7 +117,7 @@ pub async fn handle(body: Bytes) -> Result<Json<UploadRes>, (StatusCode, String)
     } else if fresh_upload && ext != "gif" {
         let b = body.clone();
 
-        let sample = spawn_blocking(move || sampler::sample_image(&b))
+        let sample = spawn_blocking(move || image::sample_image(&b))
             .await
             .map_err(internal)?;
 
@@ -130,10 +130,7 @@ pub async fn handle(body: Bytes) -> Result<Json<UploadRes>, (StatusCode, String)
 
     // create bit flags ^w^
     // idk what it is but i prefer using bits instead of booleans
-    let mut flags = flags::HAS_ORIGINAL;
-    if fresh_upload {
-        flags |= flags::IS_NEW;
-    }
+    let mut flags = 0x0;
     if is_video {
         for res in VideoSampleVariant::ALL {
             if storage::exists(FileVariant::Video(res), &hash, "mp4").await {
@@ -154,11 +151,19 @@ pub async fn handle(body: Bytes) -> Result<Json<UploadRes>, (StatusCode, String)
         }
     );
 
-    //Ok(format!("{hash}.{ext}"))
-    Ok(Json(UploadRes {
-        hash,
-        ext,
-        flags,
-        mime
-    }))
+    let status = if fresh_upload {
+        StatusCode::CREATED
+    } else {
+        StatusCode::OK
+    };
+
+    Ok((
+        status,
+        Json(UploadRes {
+            hash,
+            ext,
+            flags,
+            mime,
+        }),
+    ))
 }

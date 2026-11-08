@@ -3,10 +3,9 @@
 --main Server
 --dce full
 
---macro EnvMacro.load('../')
+--macro EnvMacro.init()
 
 -L hx2go
 --custom-target go=output
---cmd go -C output/main run .
 
 -D go-lib=github.com/gin-gonic/gin

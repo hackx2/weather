@@ -1,5 +1,7 @@
-data
-.env
+data/*
+!data/.gitkeep
+.env*
+!.env.example
 
 .vscode/*
 !.vscode/settings.json

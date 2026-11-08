@@ -1,0 +1,39 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      BACKEND_IP: "0.0.0.0"
+      BACKEND_PORT: "${BACKEND_PORT:-3001}"
+    volumes:
+      - ./data:/app/data
+    expose:
+      - "${BACKEND_PORT:-3001}"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:stable-alpine
+    ports:
+      - "${NGINX_IP:-127.0.0.1}:${NGINX_PORT:-3003}:80"
+    volumes:
+      - ./nginx/conf/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data:/artifacts/uploads:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      BACKEND_IP: "backend"
+      BACKEND_PORT: "${BACKEND_PORT:-3001}"
+      FRONTEND_IP: "0.0.0.0"
+      FRONTEND_PORT: "${FRONTEND_PORT:-3000}"
+    expose:
+      - "${FRONTEND_PORT:-3000}"
+    depends_on:
+      - backend
+    restart: unless-stopped

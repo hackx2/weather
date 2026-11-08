@@ -1,41 +1,53 @@
-#[macro_use]
-extern crate dotenv_codegen;
-
 use axum::{Router, extract::DefaultBodyLimit, http::StatusCode, routing::post};
-use tower_http::services::ServeDir;
 
 mod flags;
 mod hash;
 mod routes;
-mod sampler;
 mod storage;
-mod video;
+mod sample;
 
-const ADDR: &str = dotenv!("BACKEND_IP");
-const PORT: &str = dotenv!("BACKEND_PORT");
+// macro test
+macro_rules! load_env {
+    () => {
+        load_env!(".env", ".env.local")
+    };
+    ($(
+        $f:literal),+ // grabs 1 or more string literals (e.g. "hi")
+        $(,)? // allows you to include an optional trailing comma
+    ) => {
+        $(
+            dotenvy::from_path(concat!(env!("CARGO_MANIFEST_DIR"), "/../", $f)).ok();
+        )+
+    };
+}
 
 const BODY_LIMIT: usize = 100 * 1024 * 1024; // ~100mb (also = 100 << 20)
 
 #[tokio::main]
 async fn main() {
-    dotenv::from_path("../.env").expect("failed to load .env :c");
+    load_env!();
 
-    // cast from str -> int
-    let port: i32 = PORT.parse().unwrap();
+    let addr = std::env::var("BACKEND_IP").unwrap_or_else(|_| "127.0.0.1".into());
+    let port: u16 = std::env::var("BACKEND_PORT")
+        .unwrap_or_else(|_| "3001".into())
+        .parse()
+        .expect("must be a number <3");
 
     let app = Router::new()
         .route("/upload", post(routes::upload::handle))
-        .nest_service("/data", ServeDir::new("../data")) // nginx should do this instead but eh
         .layer(DefaultBodyLimit::max(BODY_LIMIT));
 
-    let listener = tokio::net::TcpListener::bind(format!("{ADDR}:{port}"))
+    let listener = tokio::net::TcpListener::bind(format!("{addr}:{port}"))
         .await
         .unwrap();
-    println!("listening on {ADDR}:{port}");
+    
+    //#[cfg(debug_assertions)]
+    println!("listening on {addr}:{port}");
+    
     axum::serve(listener, app).await.unwrap();
 }
 
-// suree
+//////////////////////////////////////
 
 pub fn internal<E: ToString>(err: E) -> (StatusCode, String) {
     (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())

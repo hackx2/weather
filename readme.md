@@ -4,6 +4,19 @@ Client speaks to the proxy server, which forwards a request (including the uploa
 
 Why sha256? idk 😿😿
 
+## running locally
+1. create 3 terminal instances
+2. cd nginx >> nginx -c conf/nginx.local.conf
+3. cd frontend >> haxe build.hxml
+4. cd backed >> cargo run
+
+## docker
+
+```sh
+> git clone https://github.com/hackx2/rs-image-upload-test-proxy
+> cp .env.example .env
+> docker compose --env-file .env up --build
+```
 ## run
 1.
 ```sh

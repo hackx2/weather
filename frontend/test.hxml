@@ -1,0 +1,2 @@
+build.hxml
+--cmd go -C output/main run .
